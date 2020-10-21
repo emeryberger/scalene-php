@@ -313,11 +313,11 @@ void *memcpy(void *dest, const void *src, size_t n) {
   return (*MEMCPY)(dest, src, n);
 }
 
-void *memmove(void *dest, const void *src, size_t n) {
+//void *memmove(void *dest, const void *src, size_t n) {
 //  fprintf(stderr, "memmove(%p, %p, %ld)\n", dest, src, n);
-  record_copy(n);
-  return (*MEMMOVE)(dest, src, n);
-}
+//  record_copy(n);
+//  return (*MEMMOVE)(dest, src, n);
+//}
 
 char *strcpy(char *dest, const char *src) {
 //  fprintf(stderr, "strcpy(%p, %p)\n", dest, src);
