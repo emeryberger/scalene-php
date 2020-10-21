@@ -13,6 +13,8 @@ test: scalene_php
 php:
 ifeq ("$(wildcard php-src)", "")
 	git clone 'https://github.com/whuangum/php-src.git'
+else
+	cd php-src && git pull
 endif
 	cd php-src && ./buildconf --force
 	cd php-src && ./configure --enable-debug --enable-pcntl --enable-maintainer-zts --enable-parallel
