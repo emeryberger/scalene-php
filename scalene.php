@@ -412,7 +412,7 @@ else
     echo "putenv() failed!\n";
     exit;
   }
-  if (!putenv("LD_PRELOAD=./libscalene.so")) {
+  if (!putenv("LD_PRELOAD=./libscalene_php.so")) {
     echo "putenv() failed!\n";
     exit;
   }
