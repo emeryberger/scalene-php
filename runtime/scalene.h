@@ -3,11 +3,11 @@
 
 #include <csignal>
 
-const size_t MALLOC_SAMPLING_RATE = 1048538; // ~= 1MiB
-const size_t FREE_SAMPLING_RATE = 1048538;   // ~= 1MiB
-const size_t CALL_STACK_SAMPLING_RATE = MALLOC_SAMPLING_RATE / 13;
+const size_t MALLOC_SAMPLING_RATE = 1048549; // ~= 1MiB
+const size_t FREE_SAMPLING_RATE = 1048549;   // ~= 1MiB
+const size_t CALL_STACK_SAMPLING_RATE = MALLOC_SAMPLING_RATE * 10;
 const size_t CALL_STACK_INSPECTION_DEPTH = 5; // # of frames to check
-const size_t MEMCPY_SAMPLING_RATE = MALLOC_SAMPLING_RATE * 2 + 1;
+const size_t MEMCPY_SAMPLING_RATE = 2097131; // next prime after MALLOC_SAMPLING_RATE * 2 + 1;
 
 const uint8_t MALLOC_SIGNAL = SIGXCPU;
 const uint8_t FREE_SIGNAL = SIGXFSZ;
