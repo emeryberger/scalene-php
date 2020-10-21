@@ -11,9 +11,11 @@
 
 #include "scalene.h"
 
-static char MALLOC_SIGNAL_FILE[256];
-static char MEMCPY_SIGNAL_FILE[256];
-static const uint32_t SIGNAL_FILE_FLAGS = O_WRONLY | O_CREAT | O_SYNC | O_APPEND;
+static char MALLOC_SIGNAL_FILE_NAME[256];
+static char MEMCPY_SIGNAL_FILE_NAME[256];
+static int MALLOC_SIGNAL_FILE = -1;
+static int MEMCPY_SIGNAL_FILE = -1;
+static const uint32_t SIGNAL_FILE_FLAGS = O_WRONLY | O_CREAT | O_APPEND;
 static const uint32_t SIGNAL_FILE_MODE = S_IRUSR | S_IWUSR;
 
 static void *LIBC_HANDLE = nullptr;
@@ -35,17 +37,30 @@ static uint32_t MEMCPY_SAMPLE = 0;
 [[gnu::constructor, gnu::unused]]
 static void init() {
   // assemble signal file names
-  int result = snprintf(MALLOC_SIGNAL_FILE, 255, "%s%d",
+  int result = snprintf(MALLOC_SIGNAL_FILE_NAME, 255, "%s%d",
                         "/tmp/scalene-malloc-signal", getpid());
   if (result <= 0) {
     perror("snprintf() failed");
     abort();
   }
 
-  result = snprintf(MEMCPY_SIGNAL_FILE, 255, "%s%d",
+  result = snprintf(MEMCPY_SIGNAL_FILE_NAME, 255, "%s%d",
                     "/tmp/scalene-memcpy-signal", getpid());
   if (result <= 0) {
     perror("snprintf() failed");
+    abort();
+  }
+
+  // open signal files
+  MALLOC_SIGNAL_FILE = open(MALLOC_SIGNAL_FILE_NAME, SIGNAL_FILE_FLAGS, SIGNAL_FILE_MODE);
+  if (MALLOC_SIGNAL_FILE == -1) {
+    perror("open() failed");
+    abort();
+  }
+
+  MEMCPY_SIGNAL_FILE = open(MEMCPY_SIGNAL_FILE_NAME, SIGNAL_FILE_FLAGS, SIGNAL_FILE_MODE);
+  if (MEMCPY_SIGNAL_FILE == -1) {
+    perror("open() failed");
     abort();
   }
 
@@ -82,11 +97,19 @@ static void init() {
 
 [[gnu::destructor, gnu::unused]]
 static void fini() {
-  if ((unlink(MALLOC_SIGNAL_FILE) == -1) && (errno != ENOENT)) {
+  if (close(MALLOC_SIGNAL_FILE) == -1) {
+    perror("close() failed");
+    abort();
+  }
+  if (close(MEMCPY_SIGNAL_FILE) == -1) {
+    perror("close() failed");
+    abort();
+  }
+  if ((unlink(MALLOC_SIGNAL_FILE_NAME) == -1) && (errno != ENOENT)) {
     perror("unlink() failed");
     abort();
   }
-  if ((unlink(MEMCPY_SIGNAL_FILE) == -1) && (errno != ENOENT)) {
+  if ((unlink(MEMCPY_SIGNAL_FILE_NAME) == -1) && (errno != ENOENT)) {
     perror("unlink() failed");
     abort();
   }
@@ -113,19 +136,8 @@ static void update_malloc_signal_file(const uint8_t sig, const size_t size) {
     abort();
   }
 
-  int fd = open(MALLOC_SIGNAL_FILE, SIGNAL_FILE_FLAGS, SIGNAL_FILE_MODE);
-  if (fd == -1) {
-    perror("open() failed");
-    abort();
-  }
-
-  if (write(fd, buf, strlen(buf)) == -1) {
+  if (write(MALLOC_SIGNAL_FILE, buf, strlen(buf)) == -1) {
     perror("write() failed");
-    abort();
-  }
-
-  if (close(fd) == -1) {
-    perror("close() failed");
     abort();
   }
 }
@@ -139,19 +151,8 @@ static void update_memcpy_signal_file() {
     abort();
   }
 
-  int fd = open(MEMCPY_SIGNAL_FILE, SIGNAL_FILE_FLAGS, SIGNAL_FILE_MODE);
-  if (fd == -1) {
-    perror("open() failed");
-    abort();
-  }
-
-  if (write(fd, buf, strlen(buf)) == -1) {
+  if (write(MEMCPY_SIGNAL_FILE, buf, strlen(buf)) == -1) {
     perror("write() failed");
-    abort();
-  }
-
-  if (close(fd) == -1) {
-    perror("close() failed");
     abort();
   }
 }

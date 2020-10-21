@@ -13,8 +13,10 @@ final class Scalene
   public static int $malloc_threshold = 100; // # of samples
   public static ?string $profile_target = NULL;
   public static ?array $profile_target_args = NULL;
-  public static string $alloc_signal_file = "/tmp/scalene-malloc-signal";
-  public static string $memcpy_signal_file = "/tmp/scalene-memcpy-signal";
+  public static $alloc_signal_file = NULL;
+  public static $memcpy_signal_file = NULL;
+  public static int $alloc_signal_file_pos = 0;
+  public static int $memcpy_signal_file_pos = 0;
 
   private static array $cpu_samples_php = array();
   private static array $cpu_samples_c = array();
@@ -110,17 +112,21 @@ final class Scalene
     }
 
     // read data from the runtime
-    if (file_exists(self::$alloc_signal_file)) {
-      $lines = file(self::$alloc_signal_file, FILE_IGNORE_NEW_LINES);
-      unlink(self::$alloc_signal_file);
+    if (fseek(self::$alloc_signal_file, self::$alloc_signal_file_pos)) {
+      echo "fseek() failed!\n";
+      exit;
+    }
 
-      $data = array();
-      foreach ($lines as $line) {
-        // each element = [action, timestamp, size, php_fraction]
-        $data[] = explode(",", $line);
-      }
-    } else {
-      return;
+    $data = array();
+    while (($line = fgets(self::$alloc_signal_file)) != false) {
+      // each element = [action, timestamp, size, php_fraction]
+      $data[] = explode(",", $line);
+    }
+
+    self::$alloc_signal_file_pos = ftell(self::$alloc_signal_file);
+    if (self::$alloc_signal_file_pos == false) {
+      echo "ftell() failed!\n";
+      exit;
     }
 
     // calculate & record stats
@@ -193,17 +199,21 @@ final class Scalene
     }
 
     // read data from the runtime
-    if (file_exists(self::$memcpy_signal_file)) {
-      $lines = file(self::$memcpy_signal_file, FILE_IGNORE_NEW_LINES);
-      unlink(self::$memcpy_signal_file);
+    if (fseek(self::$memcpy_signal_file, self::$memcpy_signal_file_pos)) {
+      echo "fseek() failed!\n";
+      exit;
+    }
 
-      $data = array();
-      foreach ($lines as $line) {
-        // each element = [timestamp, size]
-        $data[] = explode(",", $line);
-      }
-    } else {
-      return;
+    $data = array();
+    while (($line = fgets(self::$memcpy_signal_file)) != false) {
+      // each element = [timestamp, size]
+      $data[] = explode(",", $line);
+    }
+
+    self::$memcpy_signal_file_pos = ftell(self::$memcpy_signal_file);
+    if (self::$memcpy_signal_file_pos == false) {
+      echo "ftell() failed!\n";
+      exit;
     }
 
     // save samples
@@ -388,9 +398,26 @@ if (Scalene::$cpu_only || array_key_exists("LD_PRELOAD", $_ENV))
     exit;
   }
 
-  // update alloc/memcpy signal file names
-  Scalene::$alloc_signal_file .= strval(posix_getpid());
-  Scalene::$memcpy_signal_file .= strval(posix_getpid());
+  // open signal files
+  if (!Scalene::$cpu_only) {
+    $file_name = "/tmp/scalene-malloc-signal" . strval(posix_getpid());
+    $handle = fopen($file_name, "r");
+    if ($handle == false) {
+      echo "fopen() failed for alloc signal file!\n";
+      exit;
+    } else {
+      Scalene::$alloc_signal_file = $handle;
+    }
+
+    $file_name = "/tmp/scalene-memcpy-signal" . strval(posix_getpid());
+    $handle = fopen($file_name, "r");
+    if ($handle == false) {
+      echo "fopen() failed for memcpy signal file!\n";
+      exit;
+    } else {
+      Scalene::$memcpy_signal_file = $handle;
+    }
+  }
 
   // set up timer signal
   if (pcntl_setitimer(ITIMER_VIRTUAL,
