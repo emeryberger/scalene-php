@@ -431,6 +431,28 @@ if (Scalene::$cpu_only || array_key_exists("LD_PRELOAD", $_ENV))
   // update argv & run profiling target
   $argv = Scalene::$profile_target_args;
   include(Scalene::$profile_target);
+
+  // disable signal handlers for shutdown
+  if (!pcntl_signal(SIGALRM, SIG_IGN)) {
+    echo "pcntl_signal(SIGALRM) failed!\n";
+    exit;
+  }
+  if (!pcntl_signal(SIGVTALRM, SIG_IGN)) {
+    echo "pcntl_signal(SIGVTALRM) failed!\n";
+    exit;
+  }
+  if (!pcntl_signal(SIGXCPU, SIG_IGN)) {
+    echo "pcntl_signal(SIGXCPU) failed!\n";
+    exit;
+  }
+  if (!pcntl_signal(SIGXFSZ, SIG_IGN)) {
+    echo "pcntl_signal(SIGFXSZ) failed!\n";
+    exit;
+  }
+  if (!pcntl_signal(SIGPROF, SIG_IGN)) {
+    echo "pcntl_signal(SIGPROF) failed!\n";
+    exit;
+  }
 }
 else
 {
