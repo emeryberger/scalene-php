@@ -119,14 +119,13 @@ final class Scalene
 
     $data = array();
     while (($line = fgets(self::$alloc_signal_file)) != false) {
+      if ($line == "\n") {
+        break; // end marker reached
+      }
+
       // each element = [action, timestamp, size, php_fraction]
       $data[] = explode(",", $line);
-    }
-
-    self::$alloc_signal_file_pos = ftell(self::$alloc_signal_file);
-    if (self::$alloc_signal_file_pos == false) {
-      echo "ftell() failed!\n";
-      exit;
+      self::$alloc_signal_file_pos += (strlen($line));
     }
 
     // calculate & record stats
@@ -206,17 +205,16 @@ final class Scalene
 
     $data = array();
     while (($line = fgets(self::$memcpy_signal_file)) != false) {
+      if ($line == "\n") {
+        break; // end marker reached
+      }
+
       // each element = [timestamp, size]
       $data[] = explode(",", $line);
+      self::$memcpy_signal_file_pos += (strlen($line));
     }
 
-    self::$memcpy_signal_file_pos = ftell(self::$memcpy_signal_file);
-    if (self::$memcpy_signal_file_pos == false) {
-      echo "ftell() failed!\n";
-      exit;
-    }
-
-    // save samples
+    // calculate & record stats
     if (sort($data) == false) {
       echo "failed to sort data!\n";
       exit;
@@ -231,6 +229,7 @@ final class Scalene
     }
     self::$total_copy += $copy;
 
+    // save samples
     $entry = $trace[1]["file"] . ":" . strval($trace[1]["line"]);
     if (array_key_exists($entry, self::$memcpy_samples)) {
       self::$memcpy_samples[$entry] += $copy;

@@ -3,9 +3,9 @@
 #include <fcntl.h>
 #include <gnu/lib-names.h>
 #include <jemalloc/jemalloc.h>
+#include <sys/mman.h>
 #include <unistd.h>
 
-#include <cerrno>
 #include <cstdio>
 #include <cstring>
 
@@ -15,8 +15,17 @@ static char MALLOC_SIGNAL_FILE_NAME[256];
 static char MEMCPY_SIGNAL_FILE_NAME[256];
 static int MALLOC_SIGNAL_FILE = -1;
 static int MEMCPY_SIGNAL_FILE = -1;
-static const uint32_t SIGNAL_FILE_FLAGS = O_WRONLY | O_CREAT | O_APPEND;
-static const uint32_t SIGNAL_FILE_MODE = S_IRUSR | S_IWUSR;
+static void *MALLOC_SIGNAL_FILE_MAPPING = nullptr;
+static void *MEMCPY_SIGNAL_FILE_MAPPING = nullptr;
+static size_t MALLOC_SIGNAL_FILE_MAPPING_OFFSET = 0;
+static size_t MEMCPY_SIGNAL_FILE_MAPPING_OFFSET = 0;
+static size_t MALLOC_SIGNAL_FILE_SIZE = 1000; // 1 KB default
+static size_t MEMCPY_SIGNAL_FILE_SIZE = 1000; // 1 KB default
+static const size_t SIGNAL_FILE_MIN_SPACE_LEFT = 500; // 0.5 KB
+static const int SIGNAL_FILE_FLAGS = O_RDWR | O_CREAT;
+static const mode_t SIGNAL_FILE_MODE = S_IRUSR | S_IWUSR;
+static const int SIGNAL_FILE_MMAP_PROT = PROT_WRITE;
+static const int SIGNAL_FILE_MMAP_FLAGS = MAP_SHARED;
 
 static void *LIBC_HANDLE = nullptr;
 static void *(*MEMCPY)(void *, const void *, size_t) = nullptr;
@@ -64,6 +73,33 @@ static void init() {
     abort();
   }
 
+  // resize signal files
+  if (ftruncate(MALLOC_SIGNAL_FILE, MALLOC_SIGNAL_FILE_SIZE) == -1) {
+    perror("ftruncate() failed");
+    abort();
+  }
+  if (ftruncate(MEMCPY_SIGNAL_FILE, MEMCPY_SIGNAL_FILE_SIZE) == -1) {
+    perror("ftruncate() failed");
+    abort();
+  }
+
+  // mmap signal files
+  MALLOC_SIGNAL_FILE_MAPPING = mmap(nullptr, MALLOC_SIGNAL_FILE_SIZE,
+                                    SIGNAL_FILE_MMAP_PROT, SIGNAL_FILE_MMAP_FLAGS,
+                                    MALLOC_SIGNAL_FILE, 0);
+  if (MALLOC_SIGNAL_FILE_MAPPING == MAP_FAILED) {
+    perror("mmap() failed");
+    abort();
+  }
+
+  MEMCPY_SIGNAL_FILE_MAPPING = mmap(nullptr, MEMCPY_SIGNAL_FILE_SIZE,
+                                    SIGNAL_FILE_MMAP_PROT, SIGNAL_FILE_MMAP_FLAGS,
+                                    MEMCPY_SIGNAL_FILE, 0);
+  if (MEMCPY_SIGNAL_FILE_MAPPING == MAP_FAILED) {
+    perror("mmap() failed");
+    abort();
+  }
+
   // disable signals until the profiler completes setup
   signal(MALLOC_SIGNAL, SIG_IGN);
   signal(FREE_SIGNAL, SIG_IGN);
@@ -97,6 +133,14 @@ static void init() {
 
 [[gnu::destructor, gnu::unused]]
 static void fini() {
+  if (munmap(MALLOC_SIGNAL_FILE_MAPPING, MALLOC_SIGNAL_FILE_SIZE) == -1) {
+    perror("munmap() failed");
+    abort();
+  }
+  if (munmap(MEMCPY_SIGNAL_FILE_MAPPING, MEMCPY_SIGNAL_FILE_SIZE) == -1) {
+    perror("munmap() failed");
+    abort();
+  }
   if (close(MALLOC_SIGNAL_FILE) == -1) {
     perror("close() failed");
     abort();
@@ -105,11 +149,11 @@ static void fini() {
     perror("close() failed");
     abort();
   }
-  if ((unlink(MALLOC_SIGNAL_FILE_NAME) == -1) && (errno != ENOENT)) {
+  if (unlink(MALLOC_SIGNAL_FILE_NAME) == -1) {
     perror("unlink() failed");
     abort();
   }
-  if ((unlink(MEMCPY_SIGNAL_FILE_NAME) == -1) && (errno != ENOENT)) {
+  if (unlink(MEMCPY_SIGNAL_FILE_NAME) == -1) {
     perror("unlink() failed");
     abort();
   }
@@ -120,13 +164,17 @@ static void fini() {
 }
 
 static void update_malloc_signal_file(const uint8_t sig, const size_t size) {
-  static char buf[256];
-
   if (PHP_ALLOCS == 0) {
     PHP_ALLOCS = 1; // prevents 0/0
   }
 
-  int result = snprintf(buf, 255, "%s,%u,%ld,%lf\n",
+  char *dest = reinterpret_cast<char *>(MALLOC_SIGNAL_FILE_MAPPING) +
+               MALLOC_SIGNAL_FILE_MAPPING_OFFSET;
+
+  // the extra \n serves as an end marker that will be overwritten the next time
+  int result = snprintf(dest,
+                        MALLOC_SIGNAL_FILE_SIZE - MALLOC_SIGNAL_FILE_MAPPING_OFFSET,
+                        "%s,%u,%ld,%lf\n\n",
                         (sig == MALLOC_SIGNAL) ? "M" : "F",
                         MALLOC_TRIGGERED + FREE_TRIGGERED,
                         size,
@@ -136,24 +184,64 @@ static void update_malloc_signal_file(const uint8_t sig, const size_t size) {
     abort();
   }
 
-  if (write(MALLOC_SIGNAL_FILE, buf, strlen(buf)) == -1) {
-    perror("write() failed");
-    abort();
+  MALLOC_SIGNAL_FILE_MAPPING_OFFSET += (result - 1); // adjust for end marker
+  if ((MALLOC_SIGNAL_FILE_MAPPING_OFFSET + SIGNAL_FILE_MIN_SPACE_LEFT) >
+      MALLOC_SIGNAL_FILE_SIZE)
+  {
+    // enlarge signal file
+    if (ftruncate(MALLOC_SIGNAL_FILE, MALLOC_SIGNAL_FILE_SIZE * 2) == -1) {
+      perror("ftruncate() failed");
+      abort();
+    }
+
+    // remap signal file
+    MALLOC_SIGNAL_FILE_MAPPING = mremap(MALLOC_SIGNAL_FILE_MAPPING,
+                                        MALLOC_SIGNAL_FILE_SIZE,
+                                        MALLOC_SIGNAL_FILE_SIZE * 2,
+                                        MREMAP_MAYMOVE);
+    if (MALLOC_SIGNAL_FILE_MAPPING == MAP_FAILED) {
+      perror("mremap() failed");
+      abort();
+    }
+
+    MALLOC_SIGNAL_FILE_SIZE *= 2;
   }
 }
 
 static void update_memcpy_signal_file() {
-  static char buf[256];
+  char *dest = reinterpret_cast<char *>(MEMCPY_SIGNAL_FILE_MAPPING) +
+               MEMCPY_SIGNAL_FILE_MAPPING_OFFSET;
 
-  int result = snprintf(buf, 255, "%u, %u\n", MEMCPY_TRIGGERED, MEMCPY_SAMPLE);
+  // the extra \n serves as an end marker that will be overwritten the next time
+  int result = snprintf(dest,
+                        MEMCPY_SIGNAL_FILE_SIZE - MEMCPY_SIGNAL_FILE_MAPPING_OFFSET,
+                        "%u, %u\n\n", MEMCPY_TRIGGERED, MEMCPY_SAMPLE);
   if (result <= 0) {
     perror("snprintf() failed");
     abort();
   }
 
-  if (write(MEMCPY_SIGNAL_FILE, buf, strlen(buf)) == -1) {
-    perror("write() failed");
-    abort();
+  MEMCPY_SIGNAL_FILE_MAPPING_OFFSET += (result - 1); // adjust for end marker
+  if ((MEMCPY_SIGNAL_FILE_MAPPING_OFFSET + SIGNAL_FILE_MIN_SPACE_LEFT) >
+      MEMCPY_SIGNAL_FILE_SIZE)
+  {
+    // enlarge signal file
+    if (ftruncate(MEMCPY_SIGNAL_FILE, MEMCPY_SIGNAL_FILE_SIZE * 2) == -1) {
+      perror("ftruncate() failed");
+      abort();
+    }
+
+    // remap signal file
+    MEMCPY_SIGNAL_FILE_MAPPING = mremap(MEMCPY_SIGNAL_FILE_MAPPING,
+                                        MEMCPY_SIGNAL_FILE_SIZE,
+                                        MEMCPY_SIGNAL_FILE_SIZE * 2,
+                                        MREMAP_MAYMOVE);
+    if (MEMCPY_SIGNAL_FILE_MAPPING == MAP_FAILED) {
+      perror("mremap() failed");
+      abort();
+    }
+
+    MEMCPY_SIGNAL_FILE_SIZE *= 2;
   }
 }
 
