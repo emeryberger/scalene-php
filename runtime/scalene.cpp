@@ -46,17 +46,23 @@ static uint32_t MEMCPY_SAMPLE = 0;
 [[gnu::constructor, gnu::unused]]
 static void init() {
   // assemble signal file names
-  int result = snprintf(MALLOC_SIGNAL_FILE_NAME, 255, "%s%d",
+  int result = snprintf(MALLOC_SIGNAL_FILE_NAME, 256, "%s%d",
                         "/tmp/scalene-malloc-signal", getpid());
   if (result <= 0) {
     perror("snprintf() failed");
     abort();
+  } else if (result >= 256) {
+    fprintf(stderr, "MALLOC_SIGNAL_FILE_NAME overflow\n");
+    abort();
   }
 
-  result = snprintf(MEMCPY_SIGNAL_FILE_NAME, 255, "%s%d",
+  result = snprintf(MEMCPY_SIGNAL_FILE_NAME, 256, "%s%d",
                     "/tmp/scalene-memcpy-signal", getpid());
   if (result <= 0) {
     perror("snprintf() failed");
+    abort();
+  } else if (result >= 256) {
+    fprintf(stderr, "MEMCPY_SIGNAL_FILE_NAME overflow\n");
     abort();
   }
 
@@ -170,17 +176,20 @@ static void update_malloc_signal_file(const uint8_t sig, const size_t size) {
 
   char *dest = reinterpret_cast<char *>(MALLOC_SIGNAL_FILE_MAPPING) +
                MALLOC_SIGNAL_FILE_MAPPING_OFFSET;
+  size_t remaining_space =
+      MALLOC_SIGNAL_FILE_SIZE - MALLOC_SIGNAL_FILE_MAPPING_OFFSET;
 
   // the extra \n serves as an end marker that will be overwritten the next time
-  int result = snprintf(dest,
-                        MALLOC_SIGNAL_FILE_SIZE - MALLOC_SIGNAL_FILE_MAPPING_OFFSET,
-                        "%s,%u,%ld,%lf\n\n",
+  int result = snprintf(dest, remaining_space, "%s,%u,%ld,%lf\n\n",
                         (sig == MALLOC_SIGNAL) ? "M" : "F",
                         MALLOC_TRIGGERED + FREE_TRIGGERED,
                         size,
                         (double) PHP_ALLOCS / (PHP_ALLOCS + C_ALLOCS));
   if (result <= 0) {
     perror("snprintf() failed");
+    abort();
+  } else if (result >= remaining_space) {
+    fprintf(stderr, "malloc signal file overflow\n");
     abort();
   }
 
@@ -211,13 +220,17 @@ static void update_malloc_signal_file(const uint8_t sig, const size_t size) {
 static void update_memcpy_signal_file() {
   char *dest = reinterpret_cast<char *>(MEMCPY_SIGNAL_FILE_MAPPING) +
                MEMCPY_SIGNAL_FILE_MAPPING_OFFSET;
+  size_t remaining_space =
+      MEMCPY_SIGNAL_FILE_SIZE - MEMCPY_SIGNAL_FILE_MAPPING_OFFSET;
 
   // the extra \n serves as an end marker that will be overwritten the next time
-  int result = snprintf(dest,
-                        MEMCPY_SIGNAL_FILE_SIZE - MEMCPY_SIGNAL_FILE_MAPPING_OFFSET,
-                        "%u, %u\n\n", MEMCPY_TRIGGERED, MEMCPY_SAMPLE);
+  int result = snprintf(dest, remaining_space, "%u, %u\n\n",
+                        MEMCPY_TRIGGERED, MEMCPY_SAMPLE);
   if (result <= 0) {
     perror("snprintf() failed");
+    abort();
+  } else if (result >= remaining_space) {
+    fprintf(stderr, "memcpy signal file overflow\n");
     abort();
   }
 
