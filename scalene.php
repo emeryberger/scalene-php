@@ -466,14 +466,12 @@ else
   }
 
   // actual run
-  $args = implode(" ", array_merge(array("./php"), $argv));
-  $output = shell_exec($args);
+  $args = array_merge(array("./php"), $argv);
+  $status = proc_close(proc_open($args, [STDIN, STDOUT, STDERR], $pipes));
 
-  if ($output === NULL) {
-    echo "shell_exec() error!\n";
+  if ($status != 0) {
+    echo "child process exited with $status!\n";
     exit;
-  } else {
-    echo $output;
   }
 }
 
