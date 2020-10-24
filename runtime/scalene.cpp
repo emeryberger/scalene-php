@@ -19,8 +19,8 @@ static void *MALLOC_SIGNAL_FILE_MAPPING = nullptr;
 static void *MEMCPY_SIGNAL_FILE_MAPPING = nullptr;
 static size_t MALLOC_SIGNAL_FILE_MAPPING_OFFSET = 0;
 static size_t MEMCPY_SIGNAL_FILE_MAPPING_OFFSET = 0;
-static size_t MALLOC_SIGNAL_FILE_SIZE = 1000; // 1 KB default
-static size_t MEMCPY_SIGNAL_FILE_SIZE = 1000; // 1 KB default
+static size_t MALLOC_SIGNAL_FILE_SIZE = 1000;         // 1 KB default
+static size_t MEMCPY_SIGNAL_FILE_SIZE = 1000;         // 1 KB default
 static const size_t SIGNAL_FILE_MIN_SPACE_LEFT = 500; // 0.5 KB
 static const int SIGNAL_FILE_FLAGS = O_RDWR | O_CREAT;
 static const mode_t SIGNAL_FILE_MODE = S_IRUSR | S_IWUSR;
@@ -170,7 +170,7 @@ static void fini() {
 }
 
 static void *backup_memmove(void *dest, const void *src, size_t n) {
-  const char *from = reinterpret_cast<const char*>(src);
+  const char *from = reinterpret_cast<const char *>(src);
   char *to = reinterpret_cast<char *>(dest);
 
   if (from > to) {
