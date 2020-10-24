@@ -19,7 +19,7 @@ extern "C" {
   void *realloc(void *ptr, size_t size);
   void *calloc(size_t num, size_t size);
   void *memcpy(void *dest, const void *src, size_t n);
-//  void *memmove(void *dest, const void *src, size_t n);
+  void *memmove(void *dest, const void *src, size_t n);
   char *strcpy(char *dest, const char *src);
 }
 

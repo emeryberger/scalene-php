@@ -169,6 +169,23 @@ static void fini() {
   }
 }
 
+static void *backup_memmove(void *dest, const void *src, size_t n) {
+  const char *from = reinterpret_cast<const char*>(src);
+  char *to = reinterpret_cast<char *>(dest);
+
+  if (from > to) {
+    for (int i = 0; i < n; i++) {
+      to[i] = from[i];
+    }
+  } else if (from < to) {
+    for (int i = 1; i <= n; i++) {
+      to[n - i] = from[n - i];
+    }
+  } // do nothing if from = to
+
+  return dest;
+}
+
 static void update_malloc_signal_file(const uint8_t sig, const size_t size) {
   if (PHP_ALLOCS == 0) {
     PHP_ALLOCS = 1; // prevents 0/0
@@ -415,11 +432,15 @@ void *memcpy(void *dest, const void *src, size_t n) {
   return (*MEMCPY)(dest, src, n);
 }
 
-//void *memmove(void *dest, const void *src, size_t n) {
+void *memmove(void *dest, const void *src, size_t n) {
 //  fprintf(stderr, "memmove(%p, %p, %ld)\n", dest, src, n);
-//  record_copy(n);
-//  return (*MEMMOVE)(dest, src, n);
-//}
+  if (MEMMOVE == nullptr) {
+    return backup_memmove(dest, src, n);
+  }
+
+  record_copy(n);
+  return (*MEMMOVE)(dest, src, n);
+}
 
 char *strcpy(char *dest, const char *src) {
 //  fprintf(stderr, "strcpy(%p, %p)\n", dest, src);
