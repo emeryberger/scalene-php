@@ -32,7 +32,7 @@ static void *(*MEMCPY)(void *, const void *, size_t) = nullptr;
 static void *(*MEMMOVE)(void *, const void *, size_t) = nullptr;
 static char *(*STRCPY)(void *, const void *) = nullptr;
 
-static bool RECORDING = false; // avoid self-recursion
+static bool SHOULD_RECORD = false; // avoid self-recursion
 static uint32_t MALLOC_TRIGGERED = 0;
 static uint32_t FREE_TRIGGERED = 0;
 static uint32_t MEMCPY_TRIGGERED = 0;
@@ -45,6 +45,9 @@ static uint32_t MEMCPY_SAMPLE = 0;
 
 [[gnu::constructor, gnu::unused]]
 static void init() {
+  // disable profiling
+  SHOULD_RECORD = false;
+
   // assemble signal file names
   int result = snprintf(MALLOC_SIGNAL_FILE_NAME, 256, "%s%d",
                         "/tmp/scalene-malloc-signal", getpid());
@@ -135,10 +138,17 @@ static void init() {
     fprintf(stderr, "dlsym(strcpy) failed: %s\n", dlerror());
     abort();
   }
+
+  // enable profiling
+  SHOULD_RECORD = true;
 }
 
 [[gnu::destructor, gnu::unused]]
 static void fini() {
+  // disable profiling
+  SHOULD_RECORD = false;
+
+  // release resources
   if (munmap(MALLOC_SIGNAL_FILE_MAPPING, MALLOC_SIGNAL_FILE_SIZE) == -1) {
     perror("munmap() failed");
     abort();
@@ -276,10 +286,10 @@ static void update_memcpy_signal_file() {
 }
 
 static void record_call_stack(size_t size) {
-  if (RECORDING) {
-    return; // avoid self-recursion
+  if (SHOULD_RECORD) {
+    SHOULD_RECORD = false;
   } else {
-    RECORDING = true;
+    return; // avoid self-recursion
   }
 
   static void *frames[CALL_STACK_INSPECTION_DEPTH];
@@ -300,14 +310,14 @@ static void record_call_stack(size_t size) {
   }
 
   C_ALLOCS += size;
-  RECORDING = false;
+  SHOULD_RECORD = true;
 }
 
 static void record_alloc(size_t size) {
-  if (RECORDING) {
-    return; // avoid self-recursion
+  if (SHOULD_RECORD) {
+    SHOULD_RECORD = false;
   } else {
-    RECORDING = true;
+    return; // avoid self-recursion
   }
 
   MALLOC_SAMPLE += size;
@@ -331,14 +341,14 @@ static void record_alloc(size_t size) {
     }
   }
 
-  RECORDING = false;
+  SHOULD_RECORD = true;
 }
 
 static void record_free(size_t size) {
-  if (RECORDING) {
-    return; // avoid self-recursion
+  if (SHOULD_RECORD) {
+    SHOULD_RECORD = false;
   } else {
-    RECORDING = true;
+    return; // avoid self-recursion
   }
 
   FREE_SAMPLE += size;
@@ -354,14 +364,14 @@ static void record_free(size_t size) {
     }
   }
 
-  RECORDING = false;
+  SHOULD_RECORD = true;
 }
 
 static void record_copy(size_t size) {
-  if (RECORDING) {
-    return; // avoid self-recursion
+  if (SHOULD_RECORD) {
+    SHOULD_RECORD = false;
   } else {
-    RECORDING = true;
+    return; // avoid self-recursion
   }
 
   MEMCPY_SAMPLE += size;
@@ -377,7 +387,7 @@ static void record_copy(size_t size) {
     }
   }
 
-  RECORDING = false;
+  SHOULD_RECORD = true;
 }
 
 void *malloc(size_t size) {
