@@ -10,17 +10,17 @@ include_once("profiler.php");
 // parse arguments
 for ($i = 1; $i < $argc; $i++)
 {
-  if ($argv[$i] == "--cpu-only")
+  if ($argv[$i] === "--cpu-only")
   {
     Scalene::$cpu_only = true;
   }
-  elseif ($argv[$i] == "--use-virtual-time")
+  elseif ($argv[$i] === "--use-virtual-time")
   {
     Scalene::$use_virt_time = true;
   }
-  elseif ($argv[$i] == "--cpu-sampling-rate")
+  elseif ($argv[$i] === "--cpu-sampling-rate")
   {
-    if (++$i == $argc) {
+    if (++$i === $argc) {
       echo "Insufficient number of arguments!\n";
       exit;
     }
@@ -31,9 +31,9 @@ for ($i = 1; $i < $argc; $i++)
       exit;
     }
   }
-  elseif ($argv[$i] == "--malloc-threshold")
+  elseif ($argv[$i] === "--malloc-threshold")
   {
-    if (++$i == $argc) {
+    if (++$i === $argc) {
       echo "Insufficient number of arguments!\n";
       exit;
     }
@@ -83,7 +83,7 @@ else
   $args = array_merge(array("./php"), $argv);
   $status = proc_close(proc_open($args, [STDIN, STDOUT, STDERR], $pipes));
 
-  if ($status != 0) {
+  if ($status !== 0) {
     echo "child process exited with $status!\n";
     exit;
   }

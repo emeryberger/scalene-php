@@ -120,21 +120,21 @@ final class Scalene
     }
 
     $data = array();
-    while (($line = fgets(self::$alloc_signal_file)) != false) {
-      if ($line == "\n") {
+    while (($line = fgets(self::$alloc_signal_file)) !== false) {
+      if ($line === "\n") {
         break; // end marker reached
       }
 
       // each element = [action, timestamp, size, php_fraction]
       $arr = explode(",", $line);
-      if ($arr[0] == self::$thread_id) {
+      if ($arr[0] === self::$thread_id) {
         $data[] = $arr;
       }
       self::$alloc_signal_file_pos += (strlen($line));
     }
 
     // calculate & record stats
-    if (sort($data) == false) {
+    if (sort($data) === false) {
       echo "failed to sort data!\n";
       exit;
     }
@@ -144,7 +144,7 @@ final class Scalene
     $before = self::$current_footprint;
 
     foreach ($data as $entry) {
-      $is_malloc = ($entry[1] == "M");
+      $is_malloc = ($entry[1] === "M");
       // $timestamp = intval($entry[2]);
       $size = floatval($entry[3]) / (1024 * 1024);
       $php_fraction = floatval($entry[4]);
@@ -209,21 +209,21 @@ final class Scalene
     }
 
     $data = array();
-    while (($line = fgets(self::$memcpy_signal_file)) != false) {
-      if ($line == "\n") {
+    while (($line = fgets(self::$memcpy_signal_file)) !== false) {
+      if ($line === "\n") {
         break; // end marker reached
       }
 
       // each element = [timestamp, size]
       $arr = explode(",", $line);
-      if ($arr[0] == self::$thread_id) {
+      if ($arr[0] === self::$thread_id) {
         $data[] = $arr;
       }
       self::$memcpy_signal_file_pos += (strlen($line));
     }
 
     // calculate & record stats
-    if (sort($data) == false) {
+    if (sort($data) === false) {
       echo "failed to sort data!\n";
       exit;
     }
@@ -257,7 +257,7 @@ final class Scalene
 
     $file_name = "/tmp/scalene-malloc-signal" . strval(posix_getpid());
     $handle = fopen($file_name, "r");
-    if ($handle == false) {
+    if ($handle === false) {
       echo "fopen() failed for alloc signal file!\n";
       exit;
     } else {
@@ -266,7 +266,7 @@ final class Scalene
 
     $file_name = "/tmp/scalene-memcpy-signal" . strval(posix_getpid());
     $handle = fopen($file_name, "r");
-    if ($handle == false) {
+    if ($handle === false) {
       echo "fopen() failed for memcpy signal file!\n";
       exit;
     } else {
@@ -309,7 +309,7 @@ final class Scalene
 
     // set up timer signal
     if (pcntl_setitimer(ITIMER_VIRTUAL,
-      self::$cpu_sampling_rate, self::$cpu_sampling_rate) == -1)
+      self::$cpu_sampling_rate, self::$cpu_sampling_rate) === -1)
     {
       echo "pcntl_setitimer() failed!\n";
       exit;
@@ -367,7 +367,7 @@ final class Scalene
     // open stats file
     $file_name = "/tmp/scalene-stats-" . strval(posix_getpid());
     $stats_file = fopen($file_name, "a");
-    if ($stats_file == false) {
+    if ($stats_file === false) {
       echo "fopen() failed for stats file!\n";
       exit;
     }
@@ -413,7 +413,7 @@ final class Scalene
     $output .= round(self::$total_copy, 2) . PHP_EOL;
 
     // write output
-    if (fwrite($stats_file, $output) == false) {
+    if (fwrite($stats_file, $output) === false) {
       echo "fwrite() failed for stats file!\n";
       exit;
     }
@@ -430,7 +430,7 @@ final class Scalene
     // open stats file
     $file_name = "/tmp/scalene-stats-" . strval(posix_getpid());
     $stats_file = fopen($file_name, "r");
-    if ($stats_file == false) {
+    if ($stats_file === false) {
       echo "fopen() failed for stats file!\n";
       exit;
     }
@@ -442,11 +442,11 @@ final class Scalene
     $copy_stats = array();
     $summaries = array();
 
-    while (($line = fgets($stats_file)) != false)
+    while (($line = fgets($stats_file)) !== false)
     {
       $arr = explode(",", $line);
 
-      if ($arr[0] == "c") // cpu
+      if ($arr[0] === "c") // cpu
       {
         $loc = explode(":", $arr[1]);
         $file = $loc[0];
@@ -465,7 +465,7 @@ final class Scalene
         $line_arr[0] += floatval($arr[2]);
         $line_arr[1] += floatval($arr[3]);
       }
-      elseif ($arr[0] == "a") // alloc
+      elseif ($arr[0] === "a") // alloc
       {
         $loc = explode(":", $arr[1]);
         $file = $loc[0];
@@ -484,7 +484,7 @@ final class Scalene
         $line_arr[0] += floatval($arr[2]);
         $line_arr[1] += floatval($arr[3]);
       }
-      elseif ($arr[0] == "f") // free
+      elseif ($arr[0] === "f") // free
       {
         $loc = explode(":", $arr[1]);
         $file = $loc[0];
@@ -501,7 +501,7 @@ final class Scalene
 
         $file_arr[$line] += floatval($arr[2]);
       }
-      elseif ($arr[0] == "m") // copy
+      elseif ($arr[0] === "m") // copy
       {
         $loc = explode(":", $arr[1]);
         $file = $loc[0];
@@ -518,7 +518,7 @@ final class Scalene
 
         $file_arr[$line] += floatval($arr[2]);
       }
-      elseif ($arr[0] == "s") // summary
+      elseif ($arr[0] === "s") // summary
       {
         $pid = intval($arr[1]);
         $thread_id = intval($arr[2]);
@@ -544,7 +544,7 @@ final class Scalene
     // print stats
     if (!empty($cpu_stats))
     {
-      if (ksort($cpu_stats) == false) {
+      if (ksort($cpu_stats) === false) {
         echo "failed to sort cpu_stats!\n";
         exit;
       }
@@ -553,7 +553,7 @@ final class Scalene
       echo "FILE (LINE): PHP Time (sec) | C Time (sec)\n";
 
       foreach ($cpu_stats as $file => &$file_arr) {
-        if (ksort($file_arr) == false) {
+        if (ksort($file_arr) === false) {
           echo "failed to sort file_arr for $file!\n";
           exit;
         }
@@ -568,7 +568,7 @@ final class Scalene
 
     if (!empty($alloc_stats))
     {
-      if (ksort($alloc_stats) == false) {
+      if (ksort($alloc_stats) === false) {
         echo "failed to sort alloc_stats!\n";
         exit;
       }
@@ -577,7 +577,7 @@ final class Scalene
       echo "FILE (LINE): Total Allocated (MiB) | PHP Allocated (MiB)\n";
 
       foreach ($alloc_stats as $file => &$file_arr) {
-        if (ksort($file_arr) == false) {
+        if (ksort($file_arr) === false) {
           echo "failed to sort file_arr for $file!\n";
           exit;
         }
@@ -592,7 +592,7 @@ final class Scalene
 
     if (!empty($free_stats))
     {
-      if (ksort($free_stats) == false) {
+      if (ksort($free_stats) === false) {
         echo "failed to sort free_stats!\n";
         exit;
       }
@@ -601,7 +601,7 @@ final class Scalene
       echo "FILE (LINE): Total Freed (MiB)\n";
 
       foreach ($free_stats as $file => &$file_arr) {
-        if (ksort($file_arr) == false) {
+        if (ksort($file_arr) === false) {
           echo "failed to sort file_arr for $file!\n";
           exit;
         }
@@ -614,7 +614,7 @@ final class Scalene
 
     if (!empty($copy_stats))
     {
-      if (ksort($copy_stats) == false) {
+      if (ksort($copy_stats) === false) {
         echo "failed to sort copy_stats!\n";
         exit;
       }
@@ -623,7 +623,7 @@ final class Scalene
       echo "FILE (LINE): Total Copied (MiB)\n";
 
       foreach ($copy_stats as $file => &$file_arr) {
-        if (ksort($file_arr) == false) {
+        if (ksort($file_arr) === false) {
           echo "failed to sort file_arr for $file!\n";
           exit;
         }
@@ -636,7 +636,7 @@ final class Scalene
 
     if (!empty($summaries))
     {
-      if (ksort($summaries) == false) {
+      if (ksort($summaries) === false) {
         echo "failed to sort summaries!\n";
         exit;
       }
@@ -646,11 +646,11 @@ final class Scalene
 
       foreach ($summaries as $pid => &$proc_arr)
       {
-        if (ksort($proc_arr[0]) == false) {
+        if (ksort($proc_arr[0]) === false) {
           echo "failed to sort current footprints!\n";
           exit;
         }
-        if (ksort($proc_arr[1]) == false) {
+        if (ksort($proc_arr[1]) === false) {
           echo "failed to sort max footprints!\n";
           exit;
         }
@@ -680,7 +680,7 @@ final class Scalene
   private static function should_trace(array $trace): bool
   {
     // don't profile the profiler
-    if (strpos($trace[1]["file"], "scalene.php") == false) {
+    if (strpos($trace[1]["file"], "scalene.php") === false) {
       return true;
     } else {
       return false;
@@ -690,7 +690,7 @@ final class Scalene
   private static function get_process_time(): float
   {
     $t = 0.0;
-    if (pcntl_process_time($t) == -1) {
+    if (pcntl_process_time($t) === -1) {
       echo "pcntl_process_time() failed!\n";
       exit;
     }
