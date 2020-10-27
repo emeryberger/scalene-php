@@ -7,23 +7,24 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#include <atomic>
 #include <cstdio>
 #include <cstring>
+#include <mutex>
 
 #include "scalene.h"
 
+static std::mutex SIGNAL_FILES_LOCK;
 static char MALLOC_SIGNAL_FILE_NAME[256];
 static char MEMCPY_SIGNAL_FILE_NAME[256];
 static int MALLOC_SIGNAL_FILE = -1;
 static int MEMCPY_SIGNAL_FILE = -1;
 static void *MALLOC_SIGNAL_FILE_MAPPING = nullptr;
 static void *MEMCPY_SIGNAL_FILE_MAPPING = nullptr;
-static std::atomic_size_t MALLOC_SIGNAL_FILE_MAPPING_OFFSET = 0;
-static std::atomic_size_t MEMCPY_SIGNAL_FILE_MAPPING_OFFSET = 0;
-static std::atomic_size_t MALLOC_SIGNAL_FILE_SIZE = 1000; // 1 KB default
-static std::atomic_size_t MEMCPY_SIGNAL_FILE_SIZE = 1000; // 1 KB default
-static const size_t SIGNAL_FILE_MIN_SPACE_LEFT = 500;     // 0.5 KB
+static size_t MALLOC_SIGNAL_FILE_MAPPING_OFFSET = 0;
+static size_t MEMCPY_SIGNAL_FILE_MAPPING_OFFSET = 0;
+static size_t MALLOC_SIGNAL_FILE_SIZE = 1000;         // 1 KB default
+static size_t MEMCPY_SIGNAL_FILE_SIZE = 1000;         // 1 KB default
+static const size_t SIGNAL_FILE_MIN_SPACE_LEFT = 500; // 0.5 KB
 static const int SIGNAL_FILE_FLAGS = O_RDWR | O_CREAT;
 static const mode_t SIGNAL_FILE_MODE = S_IRUSR | S_IWUSR;
 static const int SIGNAL_FILE_MMAP_PROT = PROT_WRITE;
@@ -34,16 +35,16 @@ static void *(*MEMCPY)(void *, const void *, size_t) = nullptr;
 static void *(*MEMMOVE)(void *, const void *, size_t) = nullptr;
 static char *(*STRCPY)(void *, const void *) = nullptr;
 
-static std::atomic_bool SHOULD_RECORD = false; // avoid self-recursion
-static std::atomic_uint32_t MALLOC_TRIGGERED = 0;
-static std::atomic_uint32_t FREE_TRIGGERED = 0;
-static std::atomic_uint32_t MEMCPY_TRIGGERED = 0;
-static std::atomic_uint32_t PHP_ALLOCS = 0;
-static std::atomic_uint32_t C_ALLOCS = 0;
-static std::atomic_uint32_t MALLOC_SAMPLE = 0;
-static std::atomic_uint32_t CALL_STACK_SAMPLE = 0;
-static std::atomic_uint32_t FREE_SAMPLE = 0;
-static std::atomic_uint32_t MEMCPY_SAMPLE = 0;
+static thread_local bool SHOULD_RECORD = true; // avoid self-recursion
+static thread_local uint32_t MALLOC_TRIGGERED = 0;
+static thread_local uint32_t FREE_TRIGGERED = 0;
+static thread_local uint32_t MEMCPY_TRIGGERED = 0;
+static thread_local uint32_t PHP_ALLOCS = 0;
+static thread_local uint32_t C_ALLOCS = 0;
+static thread_local uint32_t MALLOC_SAMPLE = 0;
+static thread_local uint32_t CALL_STACK_SAMPLE = 0;
+static thread_local uint32_t FREE_SAMPLE = 0;
+static thread_local uint32_t MEMCPY_SAMPLE = 0;
 
 [[gnu::constructor, gnu::unused]]
 static void init() {
@@ -199,6 +200,8 @@ static void *backup_memmove(void *dest, const void *src, size_t n) {
 }
 
 static void update_malloc_signal_file(const uint8_t sig, const size_t size) {
+  const std::lock_guard<std::mutex> lock(SIGNAL_FILES_LOCK);
+
   if (PHP_ALLOCS == 0) {
     PHP_ALLOCS = 1; // prevents 0/0
   }
@@ -243,11 +246,13 @@ static void update_malloc_signal_file(const uint8_t sig, const size_t size) {
       abort();
     }
 
-    MALLOC_SIGNAL_FILE_SIZE += 1000;
+    MALLOC_SIGNAL_FILE_SIZE *= 2;
   }
 }
 
 static void update_memcpy_signal_file() {
+  const std::lock_guard<std::mutex> lock(SIGNAL_FILES_LOCK);
+
   char *dest = reinterpret_cast<char *>(MEMCPY_SIGNAL_FILE_MAPPING) +
                MEMCPY_SIGNAL_FILE_MAPPING_OFFSET;
   size_t remaining_space =
@@ -255,9 +260,7 @@ static void update_memcpy_signal_file() {
 
   // the extra \n serves as an end marker that will be overwritten the next time
   int result = snprintf(dest, remaining_space, "%ld,%u,%u\n\n",
-                        pthread_self(),
-                        MEMCPY_TRIGGERED.load(),
-                        MEMCPY_SAMPLE.load());
+                        pthread_self(), MEMCPY_TRIGGERED, MEMCPY_SAMPLE);
   if (result <= 0) {
     perror("snprintf() failed");
     abort();
@@ -286,7 +289,7 @@ static void update_memcpy_signal_file() {
       abort();
     }
 
-    MEMCPY_SIGNAL_FILE_SIZE += 1000;
+    MEMCPY_SIGNAL_FILE_SIZE *= 2;
   }
 }
 

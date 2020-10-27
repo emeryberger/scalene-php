@@ -28,7 +28,6 @@ final class Scalene
   private static array $memcpy_samples = array();
 
   private static ?string $thread_id = NULL;
-  private static bool $in_signal_handler = false;
   private static float $last_signal_time_virt = 0.0;
   private static float $current_footprint = 0.0;
   private static float $max_footprint = 0.0;
@@ -39,11 +38,7 @@ final class Scalene
   public static function signal_dispatch(int $signo)
   {
     // avoid self-recursion
-    if (self::$in_signal_handler) {
-      return;
-    } else {
-      self::$in_signal_handler = true;
-    }
+    pcntl_async_signals(false);
 
     switch ($signo) {
       case SIGALRM: // wall clock time
@@ -72,7 +67,7 @@ final class Scalene
     }
 
     // reset
-    self::$in_signal_handler = false;
+    pcntl_async_signals(true);
   }
 
   private static function cpu_signal_handler()
@@ -246,7 +241,7 @@ final class Scalene
     }
   }
 
-  public static function open_signal_files()
+  private static function open_signal_files()
   {
     // if we are in a thread, $cpu_only is always false
     // in that case, if LD_PRELOAD is present, then we are in full profiling mode
@@ -362,7 +357,7 @@ final class Scalene
     self::$total_copy = 0.0;
   }
 
-  public static function dump_profile()
+  private static function dump_profile()
   {
     // open stats file
     $file_name = "/tmp/scalene-stats-" . strval(posix_getpid());
@@ -697,7 +692,7 @@ final class Scalene
     return $t;
   }
 
-  public static function update_timestamps()
+  private static function update_timestamps()
   {
     self::$last_signal_time_virt = self::get_process_time();
   }
