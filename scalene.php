@@ -60,25 +60,12 @@ if (Scalene::$profile_target === NULL) {
 // set up the runtime if necessary; otherwise start profiling
 if (Scalene::$cpu_only || array_key_exists("LD_PRELOAD", $_ENV))
 {
-  // open signal files
-  if (!Scalene::$cpu_only) {
-    Scalene::open_signal_files();
-  }
-
-  // set up timer signal
-  if (pcntl_setitimer(ITIMER_VIRTUAL,
-    Scalene::$cpu_sampling_rate, Scalene::$cpu_sampling_rate) == -1)
-  {
-    echo "pcntl_setitimer() failed!\n";
-    exit;
-  }
-  Scalene::update_timestamps();
-
   // update argv & run profiling target
   $argv = Scalene::$profile_target_args;
-  Scalene::start();
   include(Scalene::$profile_target);
-  Scalene::end();
+
+  // print stats at exit, after they are dumped
+  register_shutdown_function("SCALENE\Scalene::print_stats");
 }
 else
 {
