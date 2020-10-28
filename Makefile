@@ -17,7 +17,7 @@ else
 	cd php-src && git pull
 endif
 	cd php-src && ./buildconf --force
-	cd php-src && ./configure --enable-debug --enable-pcntl --enable-maintainer-zts --enable-parallel
+	cd php-src && ./configure --enable-debug --enable-pcntl --enable-maintainer-zts --enable-parallel --with-ffi
 	$(MAKE) -C php-src clean
 	$(MAKE) -C php-src -j4
 	ln -fs php-src/sapi/cli/php
