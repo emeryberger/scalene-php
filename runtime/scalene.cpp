@@ -294,12 +294,6 @@ static void update_memcpy_signal_file() {
 }
 
 static void record_call_stack(size_t size) {
-  if (SHOULD_RECORD) {
-    SHOULD_RECORD = false;
-  } else {
-    return; // avoid self-recursion
-  }
-
   static void *frames[CALL_STACK_INSPECTION_DEPTH];
   static Dl_info dl_info;
 
@@ -307,18 +301,16 @@ static void record_call_stack(size_t size) {
   for (int i = 0; i < n; i++) {
     if (dladdr(frames[i], &dl_info)) {
       if (dl_info.dli_sname != nullptr) {
-        if ((strcasestr(dl_info.dli_sname, "zend") != nullptr) ||
-            (strcasestr(dl_info.dli_sname, "tsrm") != nullptr))
+        if ((strcasestr(dl_info.dli_sname, "zif_ffi_trampoline") != nullptr))
         {
-          PHP_ALLOCS += size;
+          C_ALLOCS += size;
           return;
         }
       }
     }
   }
 
-  C_ALLOCS += size;
-  SHOULD_RECORD = true;
+  PHP_ALLOCS += size;
 }
 
 static void record_alloc(size_t size) {
