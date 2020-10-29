@@ -269,6 +269,27 @@ final class Scalene
     }
   }
 
+  private static function close_signal_files()
+  {
+    if ((self::$alloc_signal_file === NULL) ||
+        (self::$memcpy_signal_file === NULL))
+    {
+      return;
+    }
+
+    if (fclose(self::$alloc_signal_file) === false) {
+      echo "fclose() failed for alloc signal file!\n";
+      exit;
+    }
+    self::$alloc_signal_file = NULL;
+
+    if (fclose(self::$memcpy_signal_file) === false) {
+      echo "fclose() failed for memcpy signal file!\n";
+      exit;
+    }
+    self::$memcpy_signal_file = NULL;
+  }
+
   public static function start()
   {
     // update thread id
@@ -314,8 +335,8 @@ final class Scalene
 
   public static function end()
   {
-    // https://wiki.php.net/rfc/async_signals
-    pcntl_async_signals(false);
+    // close signal files
+    self::close_signal_files();
 
     // disable signal handlers
     if (!pcntl_signal(SIGALRM, SIG_IGN)) {
