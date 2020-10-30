@@ -11,7 +11,7 @@ const size_t MEMCPY_SAMPLING_RATE = 2097131; // next prime after MALLOC_SAMPLING
 
 const uint8_t MALLOC_SIGNAL = SIGXCPU;
 const uint8_t FREE_SIGNAL = SIGXFSZ;
-const uint8_t MEMCPY_SIGNAL = SIGPROF;
+const uint8_t MEMCPY_SIGNAL = SIGWINCH;
 
 extern "C" {
   void *malloc(size_t size);

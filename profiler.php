@@ -59,8 +59,8 @@ final class Scalene
         // echo "SIGXFSZ received\n";
         self::alloc_signal_handler();
         break;
-      case SIGPROF: // memcpy
-        // echo "SIGPROF received\n";
+      case SIGWINCH: // memcpy
+        // echo "SIGWINCH received\n";
         self::memcpy_signal_handler();
         break;
       default:
@@ -336,8 +336,8 @@ final class Scalene
       echo "pcntl_signal(SIGFXSZ) failed!\n";
       exit;
     }
-    if (!pcntl_signal(SIGPROF, "SCALENE\Scalene::signal_dispatch")) {
-      echo "pcntl_signal(SIGPROF) failed!\n";
+    if (!pcntl_signal(SIGWINCH, "SCALENE\Scalene::signal_dispatch")) {
+      echo "pcntl_signal(SIGWINCH) failed!\n";
       exit;
     }
 
@@ -378,8 +378,8 @@ final class Scalene
       echo "pcntl_signal(SIGFXSZ) failed!\n";
       exit;
     }
-    if (!pcntl_signal(SIGPROF, SIG_IGN)) {
-      echo "pcntl_signal(SIGPROF) failed!\n";
+    if (!pcntl_signal(SIGWINCH, SIG_IGN)) {
+      echo "pcntl_signal(SIGWINCH) failed!\n";
       exit;
     }
 
