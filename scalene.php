@@ -60,6 +60,12 @@ if (Scalene::$profile_target === NULL) {
 // set up the runtime if necessary; otherwise start profiling
 if (Scalene::$cpu_only || array_key_exists("LD_PRELOAD", $_ENV))
 {
+  // indicate that the profiler is running
+  if (!putenv("SCALENE=1")) {
+    echo "putenv() failed!\n";
+    exit;
+  }
+
   // update argv & run profiling target
   $argv = Scalene::$profile_target_args;
   include(Scalene::$profile_target);

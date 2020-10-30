@@ -301,6 +301,11 @@ final class Scalene
 
   public static function start()
   {
+    // check if the profiler is running
+    if (getenv("SCALENE") === FALSE) {
+      return;
+    }
+
     // update process id
     // NOTE: root_process_id will be incorrect if we do multithreading
     // after forking, so we must avoid that
@@ -353,6 +358,11 @@ final class Scalene
 
   public static function end()
   {
+    // check if the profiler is running
+    if (getenv("SCALENE") === FALSE) {
+      return;
+    }
+
     // close signal files
     self::close_signal_files();
 
