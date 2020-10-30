@@ -13,6 +13,7 @@ final class Scalene
   public static int $malloc_threshold = 100; // # of samples
   public static ?string $profile_target = NULL;
   public static ?array $profile_target_args = NULL;
+  public static ?string $root_process_id = NULL;
 
   private static $alloc_signal_file = NULL;
   private static $memcpy_signal_file = NULL;
@@ -28,7 +29,6 @@ final class Scalene
   private static array $memcpy_samples = array();
 
   private static ?string $process_id = NULL;
-  private static ?string $root_process_id = NULL;
   private static ?string $thread_id = NULL;
   private static float $last_signal_time_virt = 0.0;
   private static float $current_footprint = 0.0;
@@ -306,17 +306,12 @@ final class Scalene
       return;
     }
 
-    // update process id
-    // NOTE: root_process_id will be incorrect if we do multithreading
-    // after forking, so we must avoid that
-    $new_pid = strval(posix_getpid());
-    if (self::$root_process_id === NULL) {
-      self::$root_process_id = $new_pid;
-    }
-    self::$process_id = $new_pid;
-
-    // update thread id
+    // update id
+    self::$process_id = strval(posix_getpid());
     self::$thread_id = strval(pcntl_get_thread_id());
+    if (self::$root_process_id === NULL) { // can happen in threads
+      self::$root_process_id = self::$process_id;
+    }
 
     // open signal files
     self::open_signal_files();

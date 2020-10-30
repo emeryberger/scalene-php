@@ -66,8 +66,13 @@ if (Scalene::$cpu_only || array_key_exists("LD_PRELOAD", $_ENV))
     exit;
   }
 
+  // NOTE: root_process_id will be incorrect if we do multithreading
+  // after forking, so we must avoid that
+  Scalene::$root_process_id = strval(posix_getpid());
+
   // update argv & run profiling target
   $argv = Scalene::$profile_target_args;
+  $argc = count($argv);
   include(Scalene::$profile_target);
 
   // print stats at exit, after they are dumped
