@@ -27,6 +27,8 @@ final class Scalene
   private static array $free_samples = array();
   private static array $memcpy_samples = array();
 
+  private static ?string $process_id = NULL;
+  private static ?string $root_process_id = NULL;
   private static ?string $thread_id = NULL;
   private static float $last_signal_time_virt = 0.0;
   private static float $current_footprint = 0.0;
@@ -243,6 +245,11 @@ final class Scalene
 
   private static function open_signal_files()
   {
+    // close signal files if they are open (this can happen after fork)
+    if (self::$alloc_signal_file !== NULL) {
+      self::close_signal_files();
+    }
+
     // if we are in a thread, $cpu_only is always false
     // in that case, if LD_PRELOAD is present, then we are in full profiling mode
     // otherwise, we are in CPU-only mode, and the second conidtion checks for that
@@ -250,7 +257,7 @@ final class Scalene
       return;
     }
 
-    $file_name = "/tmp/scalene-malloc-signal" . strval(posix_getpid());
+    $file_name = "/tmp/scalene-malloc-signal" . self::$process_id;
     $handle = fopen($file_name, "r");
     if ($handle === false) {
       echo "fopen() failed for alloc signal file!\n";
@@ -259,7 +266,7 @@ final class Scalene
       self::$alloc_signal_file = $handle;
     }
 
-    $file_name = "/tmp/scalene-memcpy-signal" . strval(posix_getpid());
+    $file_name = "/tmp/scalene-memcpy-signal" . self::$process_id;
     $handle = fopen($file_name, "r");
     if ($handle === false) {
       echo "fopen() failed for memcpy signal file!\n";
@@ -282,16 +289,27 @@ final class Scalene
       exit;
     }
     self::$alloc_signal_file = NULL;
+    self::$alloc_signal_file_pos = 0;
 
     if (fclose(self::$memcpy_signal_file) === false) {
       echo "fclose() failed for memcpy signal file!\n";
       exit;
     }
     self::$memcpy_signal_file = NULL;
+    self::$memcpy_signal_file_pos = 0;
   }
 
   public static function start()
   {
+    // update process id
+    // NOTE: root_process_id will be incorrect if we do multithreading
+    // after forking, so we must avoid that
+    $new_pid = strval(posix_getpid());
+    if (self::$root_process_id === NULL) {
+      self::$root_process_id = $new_pid;
+    }
+    self::$process_id = $new_pid;
+
     // update thread id
     self::$thread_id = strval(pcntl_get_thread_id());
 
@@ -381,7 +399,7 @@ final class Scalene
   private static function dump_profile()
   {
     // open stats file
-    $file_name = "/tmp/scalene-stats-" . strval(posix_getpid());
+    $file_name = "/tmp/scalene-stats-" . self::$root_process_id;
     $stats_file = fopen($file_name, "a");
     if ($stats_file === false) {
       echo "fopen() failed for stats file!\n";
@@ -420,7 +438,7 @@ final class Scalene
     // summary
     // format: type,pid,thread_id,current_footprint,max_footprint,total_alloc,total_free,total_copy
     $output .= "s,";
-    $output .= posix_getpid() . ",";
+    $output .= self::$process_id . ",";
     $output .= self::$thread_id . ",";
     $output .= round(self::$current_footprint, 2) . ",";
     $output .= round(self::$max_footprint, 2) . ",";
@@ -443,8 +461,14 @@ final class Scalene
 
   public static function print_stats()
   {
+    // check if we have something to print
+    $file_name = "/tmp/scalene-stats-" . self::$root_process_id;
+    if (!file_exists($file_name)) {
+      echo "no stats to print!\n";
+      return;
+    }
+
     // open stats file
-    $file_name = "/tmp/scalene-stats-" . strval(posix_getpid());
     $stats_file = fopen($file_name, "r");
     if ($stats_file === false) {
       echo "fopen() failed for stats file!\n";

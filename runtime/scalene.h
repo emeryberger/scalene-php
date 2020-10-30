@@ -21,6 +21,7 @@ extern "C" {
   void *memcpy(void *dest, const void *src, size_t n);
   void *memmove(void *dest, const void *src, size_t n);
   char *strcpy(char *dest, const char *src);
+  pid_t fork(void);
 }
 
 #endif // SCALENE_PHP_SCALENE_H

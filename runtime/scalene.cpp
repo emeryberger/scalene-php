@@ -34,6 +34,7 @@ static void *LIBC_HANDLE = nullptr;
 static void *(*MEMCPY)(void *, const void *, size_t) = nullptr;
 static void *(*MEMMOVE)(void *, const void *, size_t) = nullptr;
 static char *(*STRCPY)(void *, const void *) = nullptr;
+static pid_t (*FORK)() = nullptr;
 
 static thread_local bool SHOULD_RECORD = true; // avoid self-recursion
 static thread_local uint32_t MALLOC_TRIGGERED = 0;
@@ -46,10 +47,40 @@ static thread_local uint32_t CALL_STACK_SAMPLE = 0;
 static thread_local uint32_t FREE_SAMPLE = 0;
 static thread_local uint32_t MEMCPY_SAMPLE = 0;
 
-[[gnu::constructor, gnu::unused]]
-static void init() {
-  // disable profiling
-  SHOULD_RECORD = false;
+static void close_signal_files() {
+  if (munmap(MALLOC_SIGNAL_FILE_MAPPING, MALLOC_SIGNAL_FILE_SIZE) == -1) {
+    perror("munmap() failed");
+    abort();
+  }
+  if (munmap(MEMCPY_SIGNAL_FILE_MAPPING, MEMCPY_SIGNAL_FILE_SIZE) == -1) {
+    perror("munmap() failed");
+    abort();
+  }
+  if (close(MALLOC_SIGNAL_FILE) == -1) {
+    perror("close() failed");
+    abort();
+  }
+  if (close(MEMCPY_SIGNAL_FILE) == -1) {
+    perror("close() failed");
+    abort();
+  }
+
+  // reset for child process (if any)
+  MALLOC_SIGNAL_FILE = -1;
+  MEMCPY_SIGNAL_FILE = -1;
+  MALLOC_SIGNAL_FILE_MAPPING = nullptr;
+  MEMCPY_SIGNAL_FILE_MAPPING = nullptr;
+  MALLOC_SIGNAL_FILE_MAPPING_OFFSET = 0;
+  MEMCPY_SIGNAL_FILE_MAPPING_OFFSET = 0;
+  MALLOC_SIGNAL_FILE_SIZE = 1000;
+  MEMCPY_SIGNAL_FILE_SIZE = 1000;
+}
+
+static void open_signal_files() {
+  // close signal files if they are open (this can happen after fork)
+  if (MALLOC_SIGNAL_FILE != -1) {
+    close_signal_files();
+  }
 
   // assemble signal file names
   int result = snprintf(MALLOC_SIGNAL_FILE_NAME, 256, "%s%d",
@@ -111,6 +142,15 @@ static void init() {
     perror("mmap() failed");
     abort();
   }
+}
+
+[[gnu::constructor, gnu::unused]]
+static void init() {
+  // disable profiling
+  SHOULD_RECORD = false;
+
+  // set up signal files
+  open_signal_files();
 
   // disable signals until the profiler completes setup
   signal(MALLOC_SIGNAL, SIG_IGN);
@@ -142,6 +182,12 @@ static void init() {
     abort();
   }
 
+  FORK = (pid_t (*)()) dlsym(LIBC_HANDLE, "fork");
+  if (FORK == nullptr) {
+    fprintf(stderr, "dlsym(fork) failed: %s\n", dlerror());
+    abort();
+  }
+
   // enable profiling
   SHOULD_RECORD = true;
 }
@@ -152,22 +198,7 @@ static void fini() {
   SHOULD_RECORD = false;
 
   // release resources
-  if (munmap(MALLOC_SIGNAL_FILE_MAPPING, MALLOC_SIGNAL_FILE_SIZE) == -1) {
-    perror("munmap() failed");
-    abort();
-  }
-  if (munmap(MEMCPY_SIGNAL_FILE_MAPPING, MEMCPY_SIGNAL_FILE_SIZE) == -1) {
-    perror("munmap() failed");
-    abort();
-  }
-  if (close(MALLOC_SIGNAL_FILE) == -1) {
-    perror("close() failed");
-    abort();
-  }
-  if (close(MEMCPY_SIGNAL_FILE) == -1) {
-    perror("close() failed");
-    abort();
-  }
+  close_signal_files();
   if (unlink(MALLOC_SIGNAL_FILE_NAME) == -1) {
     perror("unlink() failed");
     abort();
@@ -456,4 +487,28 @@ char *strcpy(char *dest, const char *src) {
 //  fprintf(stderr, "strcpy(%p, %p)\n", dest, src);
   record_copy(strlen(src) + 1);
   return (*STRCPY)(dest, src);
+}
+
+pid_t fork() {
+  pid_t result = (*FORK)();
+
+  if (result == 0) { // child
+    // set up signal files
+    SHOULD_RECORD = false;
+    open_signal_files();
+    SHOULD_RECORD = true;
+
+    // reset counters
+    MALLOC_TRIGGERED = 0;
+    FREE_TRIGGERED = 0;
+    MEMCPY_TRIGGERED = 0;
+    PHP_ALLOCS = 0;
+    C_ALLOCS = 0;
+    MALLOC_SAMPLE = 0;
+    CALL_STACK_SAMPLE = 0;
+    FREE_SAMPLE = 0;
+    MEMCPY_SAMPLE = 0;
+  }
+
+  return result;
 }
