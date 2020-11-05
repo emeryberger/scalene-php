@@ -394,7 +394,7 @@ final class Scalene
     self::$malloc_counters = array();
     self::$free_samples = array();
     self::$memcpy_samples = array();
-    self::$current_footprint = 0.0;
+    // self::$current_footprint = 0.0;
     self::$max_footprint = 0.0;
     self::$total_allocs = 0.0;
     self::$total_free = 0.0;
