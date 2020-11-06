@@ -96,7 +96,7 @@ else
 
   if ($status !== 0) {
     echo "child process exited with $status!\n";
-    exit;
+    exit($status);
   }
 }
 
