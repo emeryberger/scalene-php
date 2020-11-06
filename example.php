@@ -1,5 +1,8 @@
 <?php
 
+include_once("profiler.php");
+
+
 /* Single Thread */
 SCALENE\Scalene::start();
 $start = microtime(true);
