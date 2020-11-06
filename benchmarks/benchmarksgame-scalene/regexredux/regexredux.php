@@ -56,10 +56,12 @@ foreach ($variants as $key => $regex){
          preg_match_all('/' . $regex . '/iS', $contents, $discard);
    }
    else if(!$pid) {
+      SCALENE\Scalene::start();
       $results[] = $regex . ',' .
          preg_match_all('/' . $regex . '/iS', $contents, $discard);
       if($key == 1 || $key == 3 || $key == 5 || $key == 7) {
          msg_send($queue, 2, implode(';', $results), false, false, $errno);
+      SCALENE\Scalene::end();
          exit;
 	  }
    }

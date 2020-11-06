@@ -30,7 +30,7 @@ while( !feof(STDIN) ) {
 }
 print_seq();
 
-exit;
+SCALENE\Scalene::end();
 
 # print the sequence out, if it exists
 function print_seq(){
@@ -41,7 +41,5 @@ function print_seq(){
     }
     $seq = '';
 }
-
-SCALENE\Scalene::end();
 
 ?>

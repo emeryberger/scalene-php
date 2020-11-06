@@ -56,6 +56,7 @@ do {
          }
          if ($i == $m){
             printf("%d\nPfannkuchen(%d) = %d\n", $checksum, $n, $maxflips);// Out of permutations.
+            SCALENE\Scalene::end();
             return;
          }
          $s[$i] = $i;
@@ -67,5 +68,3 @@ do {
       }
    }
 } while (true);
-
-SCALENE\Scalene::end();
